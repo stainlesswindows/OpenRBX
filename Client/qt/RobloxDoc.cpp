@@ -344,7 +344,8 @@ CRobloxDoc::CRobloxDoc() : m_verbs([this]() { return dataModel(); }, [this]() { 
 	addCommand(ID_EDIT_REDO, [this]() { redo(); });
 	addCommand(ID_RUN_PAUSE, [this]() { pause(); });
 	addCommand(ID_RUN_RESET, [this]() { reset(); });
-	addCommand(ID_RUN_RUN, [this]() { run(); });
+	addCommand(ID_RUN_RUN, [this]() { run(); });	
+	addCommand(ID_RUN_SOLO, [this]() { runsolo(); });
 	addCommand(ID_TOOLS_GC, [this]() { collectGarbage(); });
 
 	for (unsigned id :
@@ -367,6 +368,7 @@ CRobloxDoc::CRobloxDoc() : m_verbs([this]() { return dataModel(); }, [this]() { 
 	addCommandUpdate(ID_RUN_PAUSE, [this](CommandState& state) { updatePause(state); });
 	addCommandUpdate(ID_RUN_RESET, [this](CommandState& state) { updateReset(state); });
 	addCommandUpdate(ID_RUN_RUN, [this](CommandState& state) { updateRun(state); });
+	addCommandUpdate(ID_RUN_SOLO, [this](CommandState& state) { updateRunSolo(state); });	
 	addCommandUpdate(ID_TOOLS_GC, [this](CommandState& state) { updateCollectGarbage(state); });
 	addCommandUpdate(ID_COMMAND_THREADS, [this](CommandState& state) { updateThreadCount(state); });
 	addCommandUpdate(ID_COMMAND_HEAP, [this](CommandState& state) { updateHeapSize(state); });
@@ -594,6 +596,14 @@ void CRobloxDoc::updateRun(CommandState& state)
 	state.enabled = !runService->runDisabled && !runService->isRunState();
 }
 
+void CRobloxDoc::updateRunSolo(CommandState& state)
+{
+	RBX::DataModel::Lock lock(m_workspace->dataModel());
+	RBX::RunService* runService = dataModel()->create<RBX::RunService>();
+	state.enabled = !runService->runDisabled && !runService->isRunState();
+}
+
+
 void CRobloxDoc::updateFpsIndicator(CommandState& state)
 {
 	if (dataModel()) {
@@ -769,6 +779,17 @@ void CRobloxDoc::reset()
 }
 
 void CRobloxDoc::run()
+{
+	RBX::DataModel::Lock lock(m_workspace->dataModel());
+	if (dataModel()->create<RBX::RunService>()->getRunState() == RBX::RS_NORMAL) {
+		m_resetState.reset(SerializerV2::newRootElement());
+		dataModel()->writeChildren(m_resetState.get());
+	}
+
+	RBX::ServiceProvider::create<RBX::RunService>(dataModel().get())->run();
+}
+
+void CRobloxDoc::runsolo()
 {
 	RBX::DataModel::Lock lock(m_workspace->dataModel());
 	if (dataModel()->create<RBX::RunService>()->getRunState() == RBX::RS_NORMAL) {

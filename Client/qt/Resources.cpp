@@ -408,7 +408,7 @@ static const unsigned toolBar135Buttons[] = {
 	32891,
 };
 
-static const unsigned toolBar137Buttons[] = {32966, 32967, 32968};
+static const unsigned toolBar137Buttons[] = {32965, 32966, 32967, 32968};
 
 static const unsigned toolBar145Buttons[] = {32807, 32808, 32809, 32810, 32811, 32812, 32934, 32813};
 
@@ -579,6 +579,7 @@ static const std::map<unsigned, const char*> strings = {
 	{32936, "\nInlet"},
 	{32950, "Save the active document to Roblox"},
 	{32951, "Save the selection as a Model to Roblox"},
+	{32965, "Play in Single Player\nPlaySolo"},
 	{32966, "Test-run\nRun"},
 	{32967, "Pauses the run\nPause"},
 	{32968, "Stops and reloads the document\nReset"},

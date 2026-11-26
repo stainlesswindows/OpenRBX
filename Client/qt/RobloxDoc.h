@@ -96,6 +96,7 @@ private:
 	void pause();
 	void reset();
 	void run();
+	void runsolo();
 	void collectGarbage();
 
 	void updateUndo(CommandState& state);
@@ -106,6 +107,7 @@ private:
 	void updatePause(CommandState& state);
 	void updateReset(CommandState& state);
 	void updateRun(CommandState& state);
+	void updateRunSolo(CommandState& state);
 	void updateCollectGarbage(CommandState& state);
 	void updateThreadCount(CommandState& state);
 	void updateHeapSize(CommandState& state);
