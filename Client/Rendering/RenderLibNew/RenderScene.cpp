@@ -1,5 +1,6 @@
 #include "renderlibnew/RenderScene.h"
 
+#include "View.h"
 #include "appdraw/RbxEntity.h"
 #include "appdraw/RbxSceneNode.h"
 #include "appdraw/RbxSubEntity.h"
@@ -269,6 +270,7 @@ void RenderScene::render(G3D::RenderDevice* rd, const G3D::GCamera& camera)
 
 	G3D::CoordinateFrame viewFrame;
 	camera.getCoordinateFrame(viewFrame);
+	const float bevelLodDistance = RBX::ViewNew::getBevelLodDistance();
 
 	for (int i = 0; i < chunkArray.size(); i++) {
 		Chunk* chunk = chunkArray[i].getPointer();
@@ -296,7 +298,7 @@ void RenderScene::render(G3D::RenderDevice* rd, const G3D::GCamera& camera)
 		if (mesh->levels.size() == 2) {
 			G3D::Vector3 local = viewFrame.pointToObjectSpace(chunk->cframe().translation);
 			lod = 0;
-			if (-local.z >= 80.0f) {
+			if (bevelLodDistance > 0.0f && -local.z >= bevelLodDistance) {
 				lod = 1;
 			}
 		}

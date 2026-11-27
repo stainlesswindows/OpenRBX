@@ -37,8 +37,6 @@ public:
 		}
 	};
 
-	G3D::ReferenceCountedPointer<Render::Material> getMegaMaterial(Attributes attributes);
-
 	G3D::ReferenceCountedPointer<Render::Material> getFileMeshMaterial() { return fileMeshMaterial; }
 
 	G3D::ReferenceCountedPointer<Render::Material> getMaterial(Attributes attributes);
@@ -46,7 +44,6 @@ public:
 	MaterialFactory(G3D::TextureManager* textureManager);
 
 private:
-	G3D::ReferenceCountedPointer<Render::TextureProxy> megaTexture;
 	G3D::ReferenceCountedPointer<Render::TextureProxy> surfacesTexture;
 	G3D::ReferenceCountedPointer<Render::TextureProxy> fileMeshTexture;
 	G3D::ReferenceCountedPointer<Render::Material> fileMeshMaterial;
@@ -56,7 +53,6 @@ private:
 	using Database = std::map<Attributes, G3D::WeakReferenceCountedPointer<Render::Material>>;
 
 	Database database;
-	Database megaDatabase;
 };
 
 } // namespace RBX::View

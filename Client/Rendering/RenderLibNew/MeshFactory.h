@@ -189,6 +189,7 @@ void MeshFactory<T, N>::flushCache()
 {
 	cache1.clear();
 	decalCache.clear();
+	textureCache.clear();
 }
 
 template <class T, int N>

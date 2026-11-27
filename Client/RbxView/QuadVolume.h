@@ -74,6 +74,28 @@ protected:
 		return 0.0f;
 	}
 
+	virtual void onFaceVertex(
+		NormalId,
+		Purpose,
+		const G3D::Vector3&,
+		const G3D::Vector3&,
+		const G3D::Vector3&,
+		const G3D::Vector2&,
+		const G3D::Vector3&
+	)
+	{
+	}
+
+	virtual bool shouldCaptureFaceVertices(Purpose) const { return false; }
+
+	virtual int surfaceStripIndex(const G3D::Vector3& localRadius) const
+	{
+		return localRadius.y > localRadius.x ? 0 : 1;
+	}
+
+	virtual bool reverseSurfaceU(int stripIndex) const { return stripIndex == 1; }
+	virtual bool reverseSurfaceV(int) const { return false; }
+
 	template <int face, class Deform>
 	void buildFace(Deform deform, unsigned int uElements, unsigned int vElements, Purpose purpose)
 	{
@@ -87,8 +109,7 @@ protected:
 
 		G3D::Vector3 localRadius = G3D::abs(uvwToObject<face>(halfSize));
 
-		bool vertical = purpose == Surface && localRadius.y > localRadius.x;
-		int stripIndex = vertical ? 0 : 1;
+		const int stripIndex = purpose == Surface ? surfaceStripIndex(localRadius) : 1;
 
 		int strips =
 			(purpose == Surface && surfaceType != FLAT) ? G3D::iRound(ceil(localRadius[stripIndex] * 0.5f)) : 1;
@@ -116,8 +137,12 @@ protected:
 				texCoord[stripIndex] = offset(surfaceType);
 				texDelta[1 - stripIndex] = 2 * localRadius[1 - stripIndex];
 				texDelta[stripIndex] = 0.5f;
-				if (stripIndex == 1) {
+				if (reverseSurfaceU(stripIndex)) {
 					texDelta.x = -texDelta.x;
+				}
+				if (reverseSurfaceV(stripIndex)) {
+					texCoord.y += texDelta.y;
+					texDelta.y = -texDelta.y;
 				}
 			}
 			break;
@@ -147,7 +172,14 @@ protected:
 			}
 
 			buildFace<face>(
-				deform, G3D::Rect2D::xyxy(minCorner, maxCorner), faceZ, texCoord, texDelta, stripIndex, stripElements
+				deform,
+				G3D::Rect2D::xyxy(minCorner, maxCorner),
+				faceZ,
+				texCoord,
+				texDelta,
+				stripIndex,
+				stripElements,
+				purpose
 			);
 
 			minCorner[stripIndex] = maxCorner[stripIndex];
@@ -162,10 +194,12 @@ protected:
 		G3D::Vector2 texCoord,
 		G3D::Vector2 texDelta,
 		const int stripIndex,
-		G3D::Vector2int16 elements
+		G3D::Vector2int16 elements,
+		Purpose purpose
 	)
 	{
 		G3D::Vector3 localRadius = G3D::abs(uvwToObject<face>(halfSize));
+		const bool captureFaceVertices = shouldCaptureFaceVertices(purpose);
 
 		G3D::Vector2 step(faceCoords.width() / elements.x, faceCoords.height() / elements.y);
 		G3D::Vector2 texStep(texDelta.x / elements.x, texDelta.y / elements.y);
@@ -180,6 +214,7 @@ protected:
 			float tj = texCoord.y;
 			for (int j = 0; j <= elements.y; ++j) {
 				G3D::Vector3 vertex(vi, vj, faceZ);
+				const G3D::Vector3 sourceVertex = vertex;
 				G3D::Vector2 tex;
 				tex[1 - stripIndex] = ti;
 				tex[stripIndex] = tj;
@@ -189,6 +224,10 @@ protected:
 
 				if (texDelta == G3D::Vector2::zero()) {
 					tex = texCoord;
+				}
+
+				if (captureFaceVertices) {
+					onFaceVertex((NormalId) face, purpose, sourceVertex, vertex, normal, tex, localRadius);
 				}
 
 				vertexIndices[i * (elements.y + 1) + j] =

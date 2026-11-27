@@ -68,6 +68,9 @@ private:
 extern bool bevelsEnabled;
 
 void setBevelsEnabled(bool value);
+void setBevelSmoothShading(bool value);
+void setBevelLodDistance(float value);
+float getBevelLodDistance();
 bool getBevelsEnabled();
 
 } // namespace ViewNew

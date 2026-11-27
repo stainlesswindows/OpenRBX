@@ -282,10 +282,23 @@ G3D::ReferenceCountedPointer<Mesh> Mesh::aggregate(
 		outBoundingRadius = (hi - lo).magnitude() * 0.5;
 	}
 
-	mesh->levels.append(new Level(G3D::RenderDevice::QUADS));
+	bool hasBevelLod = false;
+	for (std::vector<G3D::ReferenceCountedPointer<Chunk>>::const_iterator iter = chunkArray.begin(); iter != end;
+		 ++iter) {
+		const G3D::ReferenceCountedPointer<Mesh>& srcMesh = (*iter)->getMesh();
+		if (srcMesh.notNull() && srcMesh->levels.size() == 2) {
+			hasBevelLod = true;
+			break;
+		}
+	}
 
-	{
-		LevelRef dstLevel = mesh->levels.last();
+	mesh->levels.append(new Level(G3D::RenderDevice::QUADS));
+	if (hasBevelLod) {
+		mesh->levels.append(new Level(G3D::RenderDevice::QUADS));
+	}
+
+	for (int lod = 0; lod < mesh->levels.size(); ++lod) {
+		LevelRef dstLevel = mesh->levels[lod];
 
 		for (std::vector<G3D::ReferenceCountedPointer<Chunk>>::const_iterator iter = chunkArray.begin(); iter != end;
 			 ++iter) {
@@ -297,7 +310,8 @@ G3D::ReferenceCountedPointer<Mesh> Mesh::aggregate(
 			}
 
 			const G3D::CoordinateFrame& cframe = chunk->cframe();
-			LevelRef srcLevel = srcMesh->detailLevel(0.3f);
+			const float sourceLod = lod == 1 && srcMesh->levels.size() == 2 ? 1.0f : 0.3f;
+			LevelRef srcLevel = srcMesh->detailLevel(sourceLod);
 			const G3D::Array<IndexType>& indexArray = srcLevel->indexArray;
 
 			G3D::CoordinateFrame netTransform = outCFrame.inverse() * cframe;

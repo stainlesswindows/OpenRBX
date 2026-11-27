@@ -2,6 +2,7 @@
 
 #include "BevelMesh.h"
 #include "QuadVolume.h"
+#include "rbxview/View.h"
 
 #include <G3D/Vector2int16.h>
 
@@ -169,10 +170,17 @@ namespace RBX::View {
 TorsoMesh::TorsoMesh(const G3D::Vector3& size, RenderSurfaceTypes surfaceTypes)
 {
 	const float shoulderInset = size.z * 0.3f;
+	const float meshBevel = getBevelsEnabled() ? bevel : 0.0f;
 
 	levels.append(new Render::Mesh::Level(G3D::RenderDevice::QUADS));
 	{
-		TorsoBuilder builder(levels.last(), size, surfaceTypes, 0, shoulderInset);
+		TorsoBuilder builder(levels.last(), size, surfaceTypes, meshBevel, shoulderInset);
+		builder.build(LevelBuilder::Surface);
+	}
+
+	if (meshBevel > 0.0f) {
+		levels.append(new Render::Mesh::Level(G3D::RenderDevice::QUADS));
+		TorsoBuilder builder(levels.last(), size, surfaceTypes, 0.0f, shoulderInset);
 		builder.build(LevelBuilder::Surface);
 	}
 }
@@ -185,7 +193,7 @@ TorsoMesh::TorsoMesh(const G3D::Vector3& size, NormalId decalFace)
 
 	levels.append(level);
 
-	TorsoBuilder builder(level, size, RenderSurfaceTypes(), bevel, shoulderInset);
+	TorsoBuilder builder(level, size, RenderSurfaceTypes(), getBevelsEnabled() ? bevel : 0.0f, shoulderInset);
 
 	builder.buildFace(decalFace, LevelBuilder::Decal);
 }
@@ -198,7 +206,7 @@ TorsoMesh::TorsoMesh(const G3D::Vector3& size, NormalId textureFace, const G3D::
 
 	levels.append(level);
 
-	TorsoBuilder builder(level, size, RenderSurfaceTypes(), bevel, shoulderInset);
+	TorsoBuilder builder(level, size, RenderSurfaceTypes(), getBevelsEnabled() ? bevel : 0.0f, shoulderInset);
 
 	builder.textureScale = mapToUvw_Legacy(size, textureFace).xy() * 2.0 / studsPerTile;
 

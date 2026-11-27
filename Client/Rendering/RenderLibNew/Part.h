@@ -49,6 +49,7 @@ public:
 
 	bool castsShadows() const override;
 	bool cullable() const override;
+	static void invalidateAllMeshes();
 
 protected:
 	std::shared_ptr<PartInstance> partInstance;
@@ -89,8 +90,6 @@ protected:
 	void onEvent(const PartInstance* source, CanAggregateChanged event) override;
 
 private:
-	bool usesMegaTexture() const;
-
 	void updateMesh() override;
 };
 

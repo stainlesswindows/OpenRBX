@@ -1,6 +1,5 @@
 #include "Part.h"
 
-#include "BrickMesh.h"
 #include "CylinderMesh.h"
 #include "FileMesh.h"
 #include "HeadMesh.h"
@@ -51,17 +50,6 @@ float primaryComponent(const G3D::Vector3& v)
 	return nz;
 }
 
-bool Part::usesMegaTexture() const
-{
-	if (specialShape == nullptr && partInstance->getPartType() == RBX::Part::BLOCK_PART) {
-		G3D::Vector3 size = partInstance->getPartSizeXml();
-
-		return primaryComponent(size) < 30.0;
-	}
-
-	return false;
-}
-
 const G3D::CoordinateFrame& PartChunk::cframe()
 {
 	coordinateFrame = partInstance->getCoordinateFrame();
@@ -77,11 +65,7 @@ G3D::ReferenceCountedPointer<Render::Material> Part::getMaterial()
 				partInstance->getColor(), partInstance->getTransparencyUi(), partInstance->getReflectance()
 			};
 
-			if (usesMegaTexture()) {
-				material = view->materialFactory->getMegaMaterial(attr);
-				materialInvalid = false;
-			}
-			else if (specialShape && specialShape->getMeshType() == SpecialShape::FILE_MESH) {
+			if (specialShape && specialShape->getMeshType() == SpecialShape::FILE_MESH) {
 				std::string textureFile;
 				if (!ContentProvider::singleton().requestContentFile(specialShape->getTextureId(), textureFile)) {
 					material = view->materialFactory->getMaterial(attr);
@@ -192,10 +176,6 @@ void Part::onPropertyChanged(const Reflection::PropertyDescriptor* descriptor)
 	PartChunk::onPropertyChanged(descriptor);
 
 	if (descriptor == &PartInstance::prop_Color) {
-		if (usesMegaTexture()) {
-			invalidateMesh();
-		}
-
 		invalidateMaterial();
 	}
 	else if (descriptor == &PartInstance::prop_Transparency || descriptor == &PartInstance::prop_Reflectance) {
@@ -205,8 +185,9 @@ void Part::onPropertyChanged(const Reflection::PropertyDescriptor* descriptor)
 
 G3D::ReferenceCountedPointer<Render::Mesh> PartChunk::getMesh()
 {
-	if (mesh.isNull()) {
+	if (mesh.isNull() || bevelGeneration != RBX::View::getBevelGeneration()) {
 		updateMesh();
+		bevelGeneration = RBX::View::getBevelGeneration();
 	}
 
 	return mesh;
@@ -356,10 +337,7 @@ void Part::updateMesh()
 
 	G3D::Vector3 size = partInstance->getPartSizeXml();
 
-	if (usesMegaTexture()) {
-		mesh = BrickMesh::create(size, surfaceTypes, partInstance->getColor());
-	}
-	else if (!specialShape) {
+	if (!specialShape) {
 		switch (partInstance->getPartType()) {
 		case RBX::Part::BALL_PART:
 			mesh = MeshFactory<SphereMesh, 1>::create(size, surfaceTypes);
@@ -521,7 +499,8 @@ void PartChunk::onChildAdded(std::shared_ptr<Instance> child)
 }
 
 PartChunk::PartChunk(float polygonOffset, const std::shared_ptr<PartInstance>& partInstance, View* view)
-	: Render::Chunk(polygonOffset), partInstance(partInstance), materialInvalid(true), view(view), specialShape(nullptr)
+	: Render::Chunk(polygonOffset), partInstance(partInstance), bevelGeneration(RBX::View::getBevelGeneration()),
+	  materialInvalid(true), view(view), specialShape(nullptr)
 {
 	view->sceneManager->addModel(this);
 

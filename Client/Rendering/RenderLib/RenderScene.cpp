@@ -1,5 +1,7 @@
 #include "renderlib/RenderScene.h"
 
+#include "rbxview/View.h"
+
 namespace RBX::Render {
 
 static float detailLevel(float x, float lo, float hi)
@@ -297,6 +299,7 @@ void RenderScene::allocateProxies(G3D::RenderDevice* rd, const G3D::GCamera& cam
 {
 	G3D::CoordinateFrame cameraCFrame;
 	camera.getCoordinateFrame(cameraCFrame);
+	const float bevelLodDistance = RBX::View::getBevelLodDistance();
 
 	float farZ = G3D::max(effectSettings.farCullZ(), camera.getFarPlaneZ());
 	float nearZ = camera.getNearPlaneZ();
@@ -350,7 +353,14 @@ void RenderScene::allocateProxies(G3D::RenderDevice* rd, const G3D::GCamera& cam
 
 			if (proxy.material != nullptr) {
 				proxy.material->baseTexture(rd);
-				proxy.mesh = chunk->getMesh()->detailLevel(lvl).getPointer();
+				float meshLod = lvl;
+				if (proxy.fullMesh->getLevelCount() == 2) {
+					meshLod = 0.0f;
+					if (bevelLodDistance > 0.0f && fabs(proxy.z) >= bevelLodDistance) {
+						meshLod = 1.0f;
+					}
+				}
+				proxy.mesh = proxy.fullMesh->detailLevel(meshLod).getPointer();
 				proxyArray.append(proxy);
 			}
 		}

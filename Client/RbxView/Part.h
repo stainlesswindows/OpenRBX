@@ -55,6 +55,7 @@ protected:
 	G3D::ReferenceCountedPointer<Render::Material> material;
 	bool materialInvalid;
 	G3D::ReferenceCountedPointer<Render::Mesh> mesh;
+	unsigned int bevelGeneration;
 	View* view;
 	SpecialShape* specialShape;
 
@@ -89,8 +90,6 @@ protected:
 	void onEvent(const PartInstance* source, CanAggregateChanged event) override;
 
 private:
-	bool usesMegaTexture() const;
-
 	void updateMesh() override;
 };
 

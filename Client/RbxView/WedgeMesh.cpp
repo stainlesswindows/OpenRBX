@@ -2,6 +2,7 @@
 
 #include "BevelMesh.h"
 #include "QuadVolume.h"
+#include "rbxview/View.h"
 
 #include <G3D/Vector2int16.h>
 #include <cmath>
@@ -151,9 +152,16 @@ namespace RBX::View {
 
 WedgeMesh::WedgeMesh(const G3D::Vector3& size, RenderSurfaceTypes surfaceTypes)
 {
+	const float meshBevel = getBevelsEnabled() ? bevel : 0.0f;
 	levels.append(new Render::Mesh::Level(G3D::RenderDevice::QUADS));
 	{
-		WedgeBuilder builder(levels.last(), size, surfaceTypes, 0);
+		WedgeBuilder builder(levels.last(), size, surfaceTypes, meshBevel);
+		builder.build(LevelBuilder::Surface);
+	}
+
+	if (meshBevel > 0.0f) {
+		levels.append(new Render::Mesh::Level(G3D::RenderDevice::QUADS));
+		WedgeBuilder builder(levels.last(), size, surfaceTypes, 0.0f);
 		builder.build(LevelBuilder::Surface);
 	}
 }
@@ -164,7 +172,7 @@ WedgeMesh::WedgeMesh(const G3D::Vector3& size, NormalId decalFace)
 
 	levels.append(level);
 
-	WedgeBuilder builder(level, size, RenderSurfaceTypes(), bevel);
+	WedgeBuilder builder(level, size, RenderSurfaceTypes(), getBevelsEnabled() ? bevel : 0.0f);
 
 	builder.buildFace(decalFace, LevelBuilder::Decal);
 }
@@ -175,7 +183,7 @@ WedgeMesh::WedgeMesh(const G3D::Vector3& size, NormalId textureFace, const G3D::
 
 	levels.append(level);
 
-	WedgeBuilder builder(level, size, RenderSurfaceTypes(), bevel);
+	WedgeBuilder builder(level, size, RenderSurfaceTypes(), getBevelsEnabled() ? bevel : 0.0f);
 
 	builder.textureScale = mapToUvw_Legacy(size, textureFace).xy() * 2.0 / studsPerTile;
 

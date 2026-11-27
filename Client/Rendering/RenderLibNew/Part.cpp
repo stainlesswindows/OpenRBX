@@ -1,6 +1,5 @@
 #include "Part.h"
 
-#include "BrickMesh.h"
 #include "CylinderMesh.h"
 #include "FileMesh.h"
 #include "HeadMesh.h"
@@ -18,7 +17,15 @@
 #include "v8datamodel/Workspace.h"
 #include "v8datamodel/custommesh.h"
 
+#include <set>
+
 namespace RBX::ViewNew {
+
+namespace {
+
+std::set<PartChunk*> partChunks;
+
+} // namespace
 
 bool PartChunk::castsShadows() const
 {
@@ -51,17 +58,6 @@ float primaryComponent(const G3D::Vector3& v)
 	return nz;
 }
 
-bool Part::usesMegaTexture() const
-{
-	if (specialShape == nullptr && partInstance->getPartType() == RBX::Part::BLOCK_PART) {
-		G3D::Vector3 size = partInstance->getPartSizeXml();
-
-		return primaryComponent(size) < 30.0;
-	}
-
-	return false;
-}
-
 const G3D::CoordinateFrame& PartChunk::cframe()
 {
 	coordinateFrame = partInstance->getCoordinateFrame();
@@ -77,11 +73,7 @@ G3D::ReferenceCountedPointer<RenderNew::Material> Part::getMaterial()
 				partInstance->getColor(), partInstance->getTransparencyUi(), partInstance->getReflectance()
 			};
 
-			if (usesMegaTexture()) {
-				material = view->materialFactory->getMegaMaterial(attr);
-				materialInvalid = false;
-			}
-			else if (specialShape && specialShape->getMeshType() == SpecialShape::FILE_MESH) {
+			if (specialShape && specialShape->getMeshType() == SpecialShape::FILE_MESH) {
 				std::string textureFile;
 				if (!ContentProvider::singleton().requestContentFile(specialShape->getTextureId(), textureFile)) {
 					material = view->materialFactory->getMaterial(attr);
@@ -118,7 +110,19 @@ void Part::onEvent(const PartInstance* source, CanAggregateChanged event)
 	view->sceneManager->setSleeping(this, event.canClump);
 }
 
-PartChunk::~PartChunk() = default;
+PartChunk::~PartChunk()
+{
+	partChunks.erase(this);
+}
+
+void PartChunk::invalidateAllMeshes()
+{
+	std::set<PartChunk*>::iterator iter = partChunks.begin();
+	while (iter != partChunks.end()) {
+		PartChunk* chunk = *iter++;
+		chunk->invalidateMesh();
+	}
+}
 
 void PartChunk::onAncestorChanged(std::shared_ptr<Instance> ancestor)
 {
@@ -155,9 +159,8 @@ void Texture::onTextureAncestorChanged(std::shared_ptr<Instance> ancestor)
 
 void PartChunk::invalidateMesh()
 {
-	mesh = nullptr;
-
 	view->sceneManager->invalidateModel(this, partInstance->getCanAggregate());
+	mesh = nullptr;
 }
 
 void PartChunk::invalidateMaterial()
@@ -199,10 +202,6 @@ void Part::onPropertyChanged(const Reflection::PropertyDescriptor* descriptor)
 	PartChunk::onPropertyChanged(descriptor);
 
 	if (descriptor == &PartInstance::prop_Color) {
-		if (usesMegaTexture()) {
-			invalidateMesh();
-		}
-
 		invalidateMaterial();
 	}
 	else if (descriptor == &PartInstance::prop_Transparency || descriptor == &PartInstance::prop_Reflectance) {
@@ -361,10 +360,7 @@ void Part::updateMesh()
 
 	G3D::Vector3 size = partInstance->getPartSizeXml();
 
-	if (usesMegaTexture()) {
-		mesh = BrickMesh::create(size, surfaceTypes, partInstance->getColor());
-	}
-	else if (!specialShape) {
+	if (!specialShape) {
 		switch (partInstance->getPartType()) {
 		case RBX::Part::BALL_PART:
 			mesh = MeshFactory<SphereMesh, 1>::create(size, surfaceTypes);
@@ -533,6 +529,7 @@ PartChunk::PartChunk(float polygonOffset, const std::shared_ptr<PartInstance>& p
 	: RenderNew::Chunk(polygonOffset), partInstance(partInstance), materialInvalid(true), view(view),
 	  specialShape(nullptr)
 {
+	partChunks.insert(this);
 	view->sceneManager->addModel(this);
 
 	childAddedConnection = Instance::event_childAdded.connect(

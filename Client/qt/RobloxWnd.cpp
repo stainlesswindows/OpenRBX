@@ -684,6 +684,7 @@ void CRobloxWnd::createRbxGfx(int cx, int cy)
 		break;
 	}
 	RBX::ViewNew::setBevelsEnabled(bevels);
+	RBX::View::setBevelsEnabled(bevels);
 
 	Ogre::Animation::setDefaultInterpolationMode(Ogre::Animation::IM_LINEAR);
 	Ogre::Animation::setDefaultRotationInterpolationMode(Ogre::Animation::RIM_LINEAR);

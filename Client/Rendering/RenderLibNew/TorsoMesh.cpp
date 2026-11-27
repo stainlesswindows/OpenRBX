@@ -1,6 +1,7 @@
 #include "TorsoMesh.h"
 
 #include "BevelMesh.h"
+#include "BrickMesh.h"
 #include "QuadVolume.h"
 
 #include <G3D/Vector2int16.h>
@@ -169,7 +170,13 @@ inline void TorsoBuilder::buildFront(Purpose purpose)
 TorsoMesh::TorsoMesh(const G3D::Vector3& size, RenderSurfaceTypes surfaceTypes)
 {
 	const float shoulderInset = size.z * 0.3f;
+	const float meshBevel = brickMeshBevels ? bevel : 0.0f;
 
+	levels.append(new RenderNew::Mesh::Level(G3D::RenderDevice::QUADS));
+	{
+		TorsoBuilder builder(levels.last(), size, surfaceTypes, meshBevel, shoulderInset);
+		builder.build(LevelBuilder::Surface);
+	}
 	levels.append(new RenderNew::Mesh::Level(G3D::RenderDevice::QUADS));
 	{
 		TorsoBuilder builder(levels.last(), size, surfaceTypes, 0, shoulderInset);
@@ -180,12 +187,13 @@ TorsoMesh::TorsoMesh(const G3D::Vector3& size, RenderSurfaceTypes surfaceTypes)
 TorsoMesh::TorsoMesh(const G3D::Vector3& size, NormalId decalFace)
 {
 	const float shoulderInset = size.z * 0.3f;
+	const float meshBevel = brickMeshBevels ? bevel : 0.0f;
 
 	RenderNew::Mesh::LevelRef level = new RenderNew::Mesh::Level(G3D::RenderDevice::QUADS);
 
 	levels.append(level);
 
-	TorsoBuilder builder(level, size, RenderSurfaceTypes(), bevel, shoulderInset);
+	TorsoBuilder builder(level, size, RenderSurfaceTypes(), meshBevel, shoulderInset);
 
 	builder.buildFace(decalFace, LevelBuilder::Decal);
 }
@@ -193,12 +201,13 @@ TorsoMesh::TorsoMesh(const G3D::Vector3& size, NormalId decalFace)
 TorsoMesh::TorsoMesh(const G3D::Vector3& size, NormalId textureFace, const G3D::Vector2& studsPerTile)
 {
 	const float shoulderInset = size.z * 0.3f;
+	const float meshBevel = brickMeshBevels ? bevel : 0.0f;
 
 	RenderNew::Mesh::LevelRef level = new RenderNew::Mesh::Level(G3D::RenderDevice::QUADS);
 
 	levels.append(level);
 
-	TorsoBuilder builder(level, size, RenderSurfaceTypes(), bevel, shoulderInset);
+	TorsoBuilder builder(level, size, RenderSurfaceTypes(), meshBevel, shoulderInset);
 
 	builder.textureScale = mapToUvw_Legacy(size, textureFace).xy() * 2.0 / studsPerTile;
 

@@ -1,6 +1,7 @@
 #include "WedgeMesh.h"
 
 #include "BevelMesh.h"
+#include "BrickMesh.h"
 #include "QuadVolume.h"
 
 #include <G3D/Vector2int16.h>
@@ -151,6 +152,12 @@ inline void WedgeBuilder::buildFront(Purpose purpose)
 
 WedgeMesh::WedgeMesh(const G3D::Vector3& size, RenderSurfaceTypes surfaceTypes)
 {
+	const float meshBevel = brickMeshBevels ? bevel : 0.0f;
+	levels.append(new RenderNew::Mesh::Level(G3D::RenderDevice::QUADS));
+	{
+		WedgeBuilder builder(levels.last(), size, surfaceTypes, meshBevel);
+		builder.build(LevelBuilder::Surface);
+	}
 	levels.append(new RenderNew::Mesh::Level(G3D::RenderDevice::QUADS));
 	{
 		WedgeBuilder builder(levels.last(), size, surfaceTypes, 0);
@@ -160,22 +167,24 @@ WedgeMesh::WedgeMesh(const G3D::Vector3& size, RenderSurfaceTypes surfaceTypes)
 
 WedgeMesh::WedgeMesh(const G3D::Vector3& size, NormalId decalFace)
 {
+	const float meshBevel = brickMeshBevels ? bevel : 0.0f;
 	RenderNew::Mesh::LevelRef level = new RenderNew::Mesh::Level(G3D::RenderDevice::QUADS);
 
 	levels.append(level);
 
-	WedgeBuilder builder(level, size, RenderSurfaceTypes(), bevel);
+	WedgeBuilder builder(level, size, RenderSurfaceTypes(), meshBevel);
 
 	builder.buildFace(decalFace, LevelBuilder::Decal);
 }
 
 WedgeMesh::WedgeMesh(const G3D::Vector3& size, NormalId textureFace, const G3D::Vector2& studsPerTile)
 {
+	const float meshBevel = brickMeshBevels ? bevel : 0.0f;
 	RenderNew::Mesh::LevelRef level = new RenderNew::Mesh::Level(G3D::RenderDevice::QUADS);
 
 	levels.append(level);
 
-	WedgeBuilder builder(level, size, RenderSurfaceTypes(), bevel);
+	WedgeBuilder builder(level, size, RenderSurfaceTypes(), meshBevel);
 
 	builder.textureScale = mapToUvw_Legacy(size, textureFace).xy() * 2.0 / studsPerTile;
 

@@ -1,11 +1,13 @@
 #include "rbxview/View.h"
 
-#include "BrickMesh.h"
+#include "BevelMesh.h"
 #include "CylinderMesh.h"
 #include "MaterialFactory.h"
 #include "PBBMesh.h"
 #include "Part.h"
 #include "SphereMesh.h"
+#include "TorsoMesh.h"
+#include "WedgeMesh.h"
 #include "renderlib/RenderScene.h"
 #include "util/standardout.h"
 #include "v8datamodel/DataModel.h"
@@ -18,6 +20,55 @@
 #include <GLG3D/Sky.h>
 
 namespace RBX::View {
+
+static bool bevelsEnabled = true;
+static unsigned int bevelGeneration = 0;
+static float bevelLodDistance = 80.0f;
+
+void setBevelsEnabled(bool value)
+{
+	if (bevelsEnabled == value) {
+		return;
+	}
+
+	bevelsEnabled = value;
+	++bevelGeneration;
+	MeshFactory<PBBMesh, 4>::flushCache();
+	MeshFactory<WedgeMesh, 1>::flushCache();
+	MeshFactory<TorsoMesh, 1>::flushCache();
+}
+
+void setBevelSmoothShading(bool value)
+{
+	if (!BevelMesh::setSmoothShadingEnabled(value)) {
+		return;
+	}
+
+	++bevelGeneration;
+	MeshFactory<PBBMesh, 4>::flushCache();
+	MeshFactory<WedgeMesh, 1>::flushCache();
+	MeshFactory<TorsoMesh, 1>::flushCache();
+}
+
+void setBevelLodDistance(float value)
+{
+	bevelLodDistance = value;
+}
+
+float getBevelLodDistance()
+{
+	return bevelLodDistance;
+}
+
+bool getBevelsEnabled()
+{
+	return bevelsEnabled;
+}
+
+unsigned int getBevelGeneration()
+{
+	return bevelGeneration;
+}
 
 Instance* View::getWorkspace()
 {
@@ -159,7 +210,6 @@ View::~View()
 	MeshFactory<CylinderAlongXMesh, 1>::flushCache();
 	MeshFactory<SphereMesh, 1>::flushCache();
 	MeshFactory<PBBMesh, 4>::flushCache();
-	BrickMesh::flushCache();
 }
 
 } // namespace RBX::View

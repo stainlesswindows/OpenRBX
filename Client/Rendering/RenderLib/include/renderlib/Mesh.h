@@ -123,6 +123,7 @@ public:
 	static void endRender(G3D::RenderDevice* rd);
 
 	const LevelRef detailLevel(float detail) const;
+	int getLevelCount() const { return levels.size(); }
 
 	void computeDirectionalShadowVolume(
 		const G3D::CoordinateFrame& cframe,

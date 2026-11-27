@@ -1,7 +1,10 @@
 #include "RenderSettings.h"
 
+#include "View.h"
 #include "ViewBase.h"
+#include "rbxview/View.h"
 #include "renderlib/AggregatingSceneManager.h"
+#include "renderlibnew/Chunk.h"
 
 #include <GLG3D/DXCaps.h>
 
@@ -30,6 +33,14 @@ static RBX::Reflection::EnumPropDescriptor<CRenderSettings, CRenderSettings::Fra
 
 static RBX::Reflection::EnumPropDescriptor<CRenderSettings, CRenderSettings::BevelMode> prop_Bevels(
 	"Bevels", "General", &CRenderSettings::getBevelMode, &CRenderSettings::setBevelMode
+);
+
+static RBX::Reflection::EnumPropDescriptor<CRenderSettings, CRenderSettings::BevelShadingMode> prop_BevelShading(
+	"BevelShading", "General", &CRenderSettings::getBevelShadingMode, &CRenderSettings::setBevelShadingMode
+);
+
+static RBX::Reflection::PropDescriptor<CRenderSettings, float> prop_BevelLODDistance(
+	"BevelLODDistance", "General", &CRenderSettings::getBevelLodDistance, &CRenderSettings::setBevelLodDistance
 );
 
 static RBX::Reflection::EnumPropDescriptor<CRenderSettings, CRenderSettings::ShadowMode> prop_Shadow(
@@ -93,6 +104,16 @@ static G3D::Vector2int16 defaultFullscreenSize()
 CRenderSettings::BevelMode CRenderSettings::getBevelMode() const
 {
 	return m_bevelMode;
+}
+
+CRenderSettings::BevelShadingMode CRenderSettings::getBevelShadingMode() const
+{
+	return m_bevelShadingMode;
+}
+
+float CRenderSettings::getBevelLodDistance() const
+{
+	return m_bevelLodDistance;
 }
 
 CRenderSettings::AntialiasingMode CRenderSettings::getAntialiasingMode() const
@@ -170,6 +191,14 @@ RBX::Reflection::EnumDesc<CRenderSettings::BevelMode>::EnumDesc()
 }
 
 template <>
+RBX::Reflection::EnumDesc<CRenderSettings::BevelShadingMode>::EnumDesc()
+	: EnumDescriptor("BevelShading", typeid(CRenderSettings::BevelShadingMode))
+{
+	addPair(CRenderSettings::c_bevelShadingFlat, "Flat");
+	addPair(CRenderSettings::c_bevelShadingSmooth, "Smooth");
+}
+
+template <>
 RBX::Reflection::EnumDesc<CRenderSettings::ShadowMode>::EnumDesc()
 	: EnumDescriptor("Shadow", typeid(CRenderSettings::ShadowMode))
 {
@@ -180,11 +209,11 @@ RBX::Reflection::EnumDesc<CRenderSettings::ShadowMode>::EnumDesc()
 
 CRenderSettings::CRenderSettings()
 	: m_graphicsMode(c_graphicsModeAutomatic), m_bevelMode(c_bevelModeAutomatic),
-	  m_antialiasingMode(c_antialiasingModeOff), m_shadowMode(c_shadowModeAutomatic),
-	  m_frameRateManagerMode(c_frameRateManagerModeAutomatic), m_minShadingQuality(defaultMinShadingQuality),
-	  m_maxShadingQuality(defaultMaxShadingQuality), m_minMeshDetail(defaultMinMeshDetail),
-	  m_maxMeshDetail(defaultMaxMeshDetail), m_delaySwapBuffer(true), m_fullscreenSize(defaultFullscreenSize()),
-	  m_windowSize(defaultWindowSize)
+	  m_bevelShadingMode(c_bevelShadingFlat), m_bevelLodDistance(80.0f), m_antialiasingMode(c_antialiasingModeOff),
+	  m_shadowMode(c_shadowModeAutomatic), m_frameRateManagerMode(c_frameRateManagerModeAutomatic),
+	  m_minShadingQuality(defaultMinShadingQuality), m_maxShadingQuality(defaultMaxShadingQuality),
+	  m_minMeshDetail(defaultMinMeshDetail), m_maxMeshDetail(defaultMaxMeshDetail), m_delaySwapBuffer(true),
+	  m_fullscreenSize(defaultFullscreenSize()), m_windowSize(defaultWindowSize)
 {
 	setName("Rendering");
 	RBX::Render::AggregatingSceneManager::aggregationSize = 1;
@@ -289,7 +318,32 @@ void CRenderSettings::setBevelMode(BevelMode value)
 {
 	if (value != m_bevelMode) {
 		m_bevelMode = value;
+		const bool enabled = value != c_bevelModeOff;
+		RBX::ViewNew::setBevelsEnabled(enabled);
+		RBX::View::setBevelsEnabled(enabled);
 		raisePropertyChanged(prop_Bevels);
+	}
+}
+
+void CRenderSettings::setBevelShadingMode(BevelShadingMode value)
+{
+	if (value != m_bevelShadingMode) {
+		m_bevelShadingMode = value;
+		const bool smooth = value == c_bevelShadingSmooth;
+		RBX::ViewNew::setBevelSmoothShading(smooth);
+		RBX::View::setBevelSmoothShading(smooth);
+		raisePropertyChanged(prop_BevelShading);
+	}
+}
+
+void CRenderSettings::setBevelLodDistance(float value)
+{
+	value = std::max(0.0f, value);
+	if (value != m_bevelLodDistance) {
+		m_bevelLodDistance = value;
+		RBX::ViewNew::setBevelLodDistance(value);
+		RBX::View::setBevelLodDistance(value);
+		raisePropertyChanged(prop_BevelLODDistance);
 	}
 }
 

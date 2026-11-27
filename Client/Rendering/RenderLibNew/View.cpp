@@ -1,11 +1,14 @@
 #include "View.h"
 
+#include "BevelMesh.h"
 #include "BrickMesh.h"
 #include "CylinderMesh.h"
 #include "MaterialFactory.h"
 #include "PBBMesh.h"
 #include "Part.h"
 #include "SphereMesh.h"
+#include "TorsoMesh.h"
+#include "WedgeMesh.h"
 #include "appdraw/RbxSceneManager.h"
 #include "appdraw/RbxSky.h"
 #include "appdraw/VisualEngine.h"
@@ -52,11 +55,37 @@ void View::invalidateLighting(bool updateSkybox)
 }
 
 bool bevelsEnabled = true;
+static bool bevelChangePending = false;
+static float bevelLodDistance = 80.0f;
 
 void setBevelsEnabled(bool value)
 {
+	if (bevelsEnabled == value) {
+		return;
+	}
+
 	bevelsEnabled = value;
 	brickMeshBevels = value;
+	bevelChangePending = true;
+}
+
+void setBevelSmoothShading(bool value)
+{
+	if (!BevelMesh::setSmoothShadingEnabled(value)) {
+		return;
+	}
+
+	bevelChangePending = true;
+}
+
+void setBevelLodDistance(float value)
+{
+	bevelLodDistance = value;
+}
+
+float getBevelLodDistance()
+{
+	return bevelLodDistance;
 }
 
 bool getBevelsEnabled()
@@ -300,6 +329,14 @@ void View::updateLighting(void* rd)
 void View::render(void* rd)
 {
 	updateLighting(rd);
+	if (bevelChangePending) {
+		PartChunk::invalidateAllMeshes();
+		MeshFactory<PBBMesh, 4>::flushCache();
+		MeshFactory<WedgeMesh, 1>::flushCache();
+		MeshFactory<TorsoMesh, 1>::flushCache();
+		bevelChangePending = false;
+	}
+	sceneManager->prerender(0.0);
 	renderLibScene->render(static_cast<G3D::RenderDevice*>(rd), dataModel->getWorkspace()->getGCamera());
 }
 
@@ -339,7 +376,6 @@ View::~View()
 	MeshFactory<CylinderAlongXMesh, 1>::flushCache();
 	MeshFactory<SphereMesh, 1>::flushCache();
 	MeshFactory<PBBMesh, 4>::flushCache();
-	BrickMesh::flushCache();
 }
 
 void View::updateLighting()

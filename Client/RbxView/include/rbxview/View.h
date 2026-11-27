@@ -29,6 +29,13 @@ namespace View {
 
 class MaterialFactory;
 
+void setBevelsEnabled(bool value);
+void setBevelSmoothShading(bool value);
+void setBevelLodDistance(float value);
+float getBevelLodDistance();
+bool getBevelsEnabled();
+unsigned int getBevelGeneration();
+
 class View : public ViewBase
 {
 private:
