@@ -1,0 +1,195 @@
+name: experiments
+
+on:
+  push:
+    branches: [experimental]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clang-format:
+    name: 'clang-format'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run clang-format
+        run: |
+          find WebService Client \( -iname '*.h' -o -iname '*.cpp' \) \
+            -not -path 'Client/App/lua-5.1.1/*' \
+            -not -path 'Client/Network/raknet30/*' \
+            -not -path 'Client/Rendering/g3d/*' \
+            -not -path 'Client/Rendering/OgreSDK/*' \
+            -not -path 'Client/win/Scintilla*' | xargs -r \
+          pipx run "clang-format>=22,<23" \
+            --style=file \
+            -i
+      - name: Check diff
+        run: |
+          git diff --exit-code
+
+  build:
+    name: ${{ matrix.name }}
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: 'MSVC (x64)',            arch: 'amd64',     config: 'RelWithDebInfo', targets: 'all', package: 'win64' }
+          - { name: 'MSVC (x64) clang-tidy', arch: 'amd64',     config: 'Debug', targets: 'app network', clang-tidy: true }
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup vcvars
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Add Visual Studio LLVM to PATH
+        if: ${{ matrix.clang-tidy }}
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH (Join-Path $env:VCINSTALLDIR 'Tools\Llvm\x64\bin')
+
+      - name: Setup sccache
+        if: ${{ !matrix.clang-tidy }}
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Cache third-party
+        id: thirdparty
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/3rdparty/qtbase-build/install
+            build/3rdparty/openssl-build/install
+            build/3rdparty/curl-build/install
+            build/3rdparty/mesa-build/install
+          key: thirdparty-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('3rdparty/CMakeLists.txt', '3rdparty/qtbase/**', '3rdparty/qt5compat/**', '3rdparty/openssl/**', '3rdparty/curl/**', '3rdparty/mesa/**') }}
+
+      - name: Install Mesa build tools
+        if: ${{ steps.thirdparty.outputs.cache-hit != 'true' }}
+        shell: pwsh
+        run: |
+          python -m pip install meson mako packaging pyyaml
+          choco install winflexbison3 -y --no-progress
+
+      - name: Build
+        shell: pwsh
+        env:
+          SCCACHE_GHA_ENABLED: ${{ !matrix.clang-tidy }}
+        run: |
+          $launcher = if ('${{ matrix.clang-tidy }}' -eq 'true') { '' } else { 'sccache' }
+          cmake -S . -B build -G Ninja `
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl `
+            -DCMAKE_C_COMPILER_LAUNCHER="$launcher" `
+            -DCMAKE_CXX_COMPILER_LAUNCHER="$launcher" `
+            -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded `
+            -DCMAKE_BUILD_TYPE=${{ matrix.config }} `
+            -DENABLE_CLANG_TIDY=${{ !!matrix.clang-tidy }}
+          cmake --build build --target ${{ matrix.targets }} -- -k0
+
+      - name: Package
+        if: ${{ matrix.package }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/dist/openrbx/RBXGS | Out-Null
+          Copy-Item build/WebService.exe, build/WebService.pdb, build/OpenAL32.dll, build/3rdparty/GLU32.DLL, build/3rdparty/mesa-build/install/bin/opengl32.dll, build/3rdparty/mesa-build/install/bin/libgallium_wgl.dll, build/3rdparty/mesa-build/install/bin/libEGL.dll build/dist/openrbx/RBXGS
+          New-Item -ItemType Directory -Force build/dist/openrbx/Roblox | Out-Null
+          Copy-Item build/Roblox.exe, build/Roblox.pdb, build/AppSettings.xml, build/ReflectionMetadata.xml, build/copyrights.txt, build/OpenAL32.dll, build/rgmain.dll, build/rgpar.dll, build/rggl.dll, build/rgdx.dll, build/Qt6Core.dll, build/Qt6Gui.dll, build/Qt6Widgets.dll, build/Qt6Core5Compat.dll build/dist/openrbx/Roblox
+          Copy-Item -Recurse build/platforms, build/imageformats, build/styles build/dist/openrbx/Roblox
+          Compress-Archive -Path build/dist/openrbx/* -DestinationPath build/dist/openrbx-${{ matrix.package }}.zip
+
+      - name: Upload Build Artifacts
+        if: ${{ matrix.package }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: '${{ matrix.name }}'
+          path: build/dist/openrbx-*.zip
+
+  linux:
+    name: 'GCC (x64)'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 ninja-build libgl-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxfixes-dev libxss-dev libxtst-dev libxt-dev libxaw7-dev libxxf86vm-dev \
+            libx11-xcb-dev libxcb1-dev libxcb-cursor-dev libxcb-glx0-dev libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-keysyms1-dev libxcb-randr0-dev libxcb-render-util0-dev libxcb-shape0-dev libxcb-shm0-dev \
+            libxcb-sync-dev libxcb-util-dev libxcb-xfixes0-dev libxcb-xkb-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libfontconfig1-dev libfreetype-dev libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libcups2-dev \
+            libpipewire-0.3-dev libpulse-dev libasound2-dev libegl-dev libopengl-dev
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Cache third-party
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/3rdparty/qtbase-build/install
+            build/3rdparty/openssl-build/install
+            build/3rdparty/curl-build/install
+          key: thirdparty-${{ runner.os }}-${{ hashFiles('3rdparty/CMakeLists.txt', '3rdparty/qtbase/**', '3rdparty/qt5compat/**', '3rdparty/openssl/**', '3rdparty/curl/**') }}
+
+      - name: Build
+        env:
+          SCCACHE_GHA_ENABLED: true
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build -- -k0
+
+      - name: Package
+        run: |
+          mkdir -p build/dist/openrbx/Roblox build/dist/openrbx/RBXGS
+          cp build/Roblox build/rgmain.so build/rggl.so build/rgpar.so build/libopenal.so.1 build/AppSettings.xml build/ReflectionMetadata.xml build/copyrights.txt build/dist/openrbx/Roblox
+          cp -r build/lib build/plugins build/dist/openrbx/Roblox
+          cp build/WebService build/libopenal.so.1 build/dist/openrbx/RBXGS
+          tar -C build/dist/openrbx -czf build/dist/openrbx-linux64.tar.gz Roblox RBXGS
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: 'GCC (x64)'
+          path: build/dist/openrbx-*.tar.gz
+
+  release:
+    name: 'Release'
+    if: ${{ github.event_name == 'push' && github.ref_name == 'experimental' && github.repository == 'stainlesswindows/OpenRBX' }}
+    runs-on: ubuntu-latest
+    needs:
+      - clang-format
+      - build
+      - linux
+    permissions:
+      contents: write
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: "*"
+          path: Release
+          merge-multiple: true
+
+      - name: Checkout uploadtool
+        uses: actions/checkout@v6
+        with:
+          repository: 'probonopd/uploadtool'
+          path: 'uploadtool'
+
+      - name: Upload Continuous Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./uploadtool/upload.sh Release/*
