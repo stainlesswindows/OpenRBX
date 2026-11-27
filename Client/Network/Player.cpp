@@ -196,6 +196,13 @@ void Player::setCharacter(ModelInstance* value)
 
 		if (value) {
 			character = shared_from(value);
+			if (Players::backendProcessing(this, false)) {
+				characterDiedConnection = Humanoid::event_Died.connect(
+					Humanoid::modelIsCharacter(character.get()),
+					[this]() { onCharacterDied(); },
+					0
+				);
+			}
 			Notifier<Player, CharacterAdded>::raise(CharacterAdded(character.get()));
 			if (Players::frontendProcessing(this, false)) {
 				onCharacterChangedFrontend();
@@ -203,6 +210,29 @@ void Player::setCharacter(ModelInstance* value)
 		}
 
 		raisePropertyChanged(prop_Character);
+	}
+}
+
+void Player::onCharacterDied()
+{
+	if (!Players::backendProcessing(this, true)) {
+		return;
+	}
+
+	Players* players = ServiceProvider::find<Players>(this);
+	if (players && !players->getCharacterAutoSpawnProperty()) {
+		return;
+	}
+
+	if (TimerService* timer = ServiceProvider::create<TimerService>(this)) {
+		timer->delay(
+			[self = shared_from(this)] {
+				if (ServiceProvider::find<Workspace>(self.get()) && Players::backendProcessing(self.get(), true)) {
+					self->loadCharacter();
+				}
+			},
+			5.0
+		);
 	}
 }
 

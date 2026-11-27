@@ -57,6 +57,10 @@ static Reflection::BoundFuncDesc<Players, std::shared_ptr<Instance>(int), 1> fun
 	&Players::getPlayerByID, "GetPlayerByID", "userID", Reflection::FunctionDescriptor::NeedTrustedCaller
 );
 
+Reflection::PropDescriptor<Players, bool> Players::propCharacterAutoSpawn(
+	"CharacterAutoLoads", "Behavior", &Players::getCharacterAutoSpawnProperty, &Players::setCharacterAutoSpawnProperty, Reflection::PropertyDescriptor::STANDARD
+);
+
 static Reflection::BoundFuncDesc<Players, void(std::string), 1> funcChat(
 	&Players::chat, "Chat", "message", Reflection::FunctionDescriptor::NeedTrustedCaller
 );
@@ -233,7 +237,7 @@ Player* Players::getPlayerFromCharacter(Instance* character)
 	return nullptr;
 }
 
-Players::Players() : players(std::vector<std::shared_ptr<Instance>>()), peer(nullptr), maxPlayers(12)
+Players::Players() : players(std::vector<std::shared_ptr<Instance>>()), peer(nullptr), maxPlayers(12), characterAutoSpawn(true)
 {
 	setName("Players");
 	plugin.reset(new Plugin(this));
@@ -391,6 +395,20 @@ void Players::addChatMessage(const ChatMessage& message)
 
 	Notifier<Players, ChatMessage>::raise(message);
 	Player::event_Chatted.fire(message.source.get(), message.message, message.destination);
+}
+
+void Players::setCharacterAutoSpawnProperty(bool value)
+{
+	if(value != characterAutoSpawn)
+	{
+		characterAutoSpawn = value;
+		raisePropertyChanged(propCharacterAutoSpawn);
+	}
+}
+
+bool Players::getShouldAutoSpawnCharacter() const
+{
+	return characterAutoSpawn;
 }
 
 bool Players::OnReceive(RakPeerInterface* peer, Packet* packet)

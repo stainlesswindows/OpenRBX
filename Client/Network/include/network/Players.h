@@ -75,6 +75,7 @@ class Players : public DescribedNonCreatable<Players, Instance, sPlayers>,
 				public Notifier<Players, SuperSafeChanged>,
 				public Listener<Player, CharacterAdded>
 {
+	bool characterAutoSpawn;
 	std::unique_ptr<AbuseReporter> abuseReporter;
 	std::list<ChatMessage> chatHistory;
 
@@ -91,6 +92,7 @@ class Players : public DescribedNonCreatable<Players, Instance, sPlayers>,
 
 public:
 	static Reflection::RefPropDescriptor<Players, Player> propLocalPlayer;
+	static Reflection::PropDescriptor<Players, bool> propCharacterAutoSpawn;
 
 	Players();
 	~Players() override;
@@ -117,6 +119,9 @@ public:
 	void reportAbuse(std::shared_ptr<Instance> player, std::string comment);
 
 	void setAbuseReportUrl(std::string value);
+	bool getCharacterAutoSpawnProperty() const { return characterAutoSpawn; }
+	void setCharacterAutoSpawnProperty(bool value);
+	bool getShouldAutoSpawnCharacter() const;	
 
 	bool OnReceive(RakPeerInterface* peer, Packet* packet);
 	void setConnection(RakPeerInterface* peer);
