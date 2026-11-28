@@ -585,8 +585,12 @@ void CRobloxDoc::updateReset(CommandState& state)
 {
 	RBX::DataModel::Lock lock(m_workspace->dataModel());
 	RBX::RunState runState = dataModel()->create<RBX::RunService>()->getRunState();
-	bool hasLocalPlayer = RBX::Network::Players::findLocalPlayer(dataModel().get()) != nullptr;
-	state.enabled = runState != RBX::RS_NORMAL && !hasLocalPlayer;
+	// Disable reset only when acting as a real network client (joined a server).
+	// Solo play and plain run() both run entirely in-editor, so reset is always
+	// available there regardless of whether a local player exists.
+	bool isNetworkClient = !m_isSoloPlay &&
+	                       RBX::Network::Players::clientIsPresent(dataModel().get(), true);
+	state.enabled = runState != RBX::RS_NORMAL && !isNetworkClient;
 }
 
 void CRobloxDoc::updateRun(CommandState& state)
@@ -600,7 +604,10 @@ void CRobloxDoc::updateRunSolo(CommandState& state)
 {
 	RBX::DataModel::Lock lock(m_workspace->dataModel());
 	RBX::RunService* runService = dataModel()->create<RBX::RunService>();
-	state.enabled = !runService->runDisabled && !runService->isRunState();
+	// Solo play is only available when the simulation is fully stopped (RS_NORMAL)
+	// and no network session is active.
+	bool networkClientPresent = RBX::Network::Players::clientIsPresent(dataModel().get(), true);
+	state.enabled = !runService->runDisabled && !runService->isRunState() && !networkClientPresent;
 }
 
 
@@ -771,6 +778,14 @@ void CRobloxDoc::reset()
 	RBX::DataModel::Lock lock(m_workspace->dataModel());
 	if (dataModel()->create<RBX::RunService>()->getRunState() != RBX::RS_NORMAL) {
 		RBX::ServiceProvider::create<RBX::RunService>(dataModel().get())->reset();
+
+		// Clear the solo flag before restoring state.
+		// Do NOT manually setParent(nullptr) on the local player here — clearContents()
+		// below will destroy the entire service tree cleanly, including Players and its
+		// local player. Calling setParent() first leaves Players with a dangling internal
+		// localPlayer pointer and causes a crash on the next runsolo() call.
+		m_isSoloPlay = false;
+
 		dataModel()->clearContents();
 		SerializerV2::load(m_resetState.get(), dataModel().get());
 		dataModel()->getWorkspace()->joinAllHack();
@@ -792,12 +807,32 @@ void CRobloxDoc::run()
 void CRobloxDoc::runsolo()
 {
 	RBX::DataModel::Lock lock(m_workspace->dataModel());
+
+	// Save state for reset, same as run()
 	if (dataModel()->create<RBX::RunService>()->getRunState() == RBX::RS_NORMAL) {
 		m_resetState.reset(SerializerV2::newRootElement());
 		dataModel()->writeChildren(m_resetState.get());
 	}
 
+	// Ensure the Visit service is present (equivalent to game:GetService("Visit"))
+	RBX::ServiceProvider::create<RBX::Visit>(dataModel().get());
+
+	// Create the local player (equivalent to Players:CreateLocalPlayer(0))
+	RBX::Network::Players* players =
+	    RBX::ServiceProvider::create<RBX::Network::Players>(dataModel().get());
+	std::shared_ptr<RBX::Instance> playerInstance = players->createLocalPlayer(0);
+
+	// Start the simulation (equivalent to RunService:run())
 	RBX::ServiceProvider::create<RBX::RunService>(dataModel().get())->run();
+
+	// Load the character after the simulation is running
+	// (equivalent to player:LoadCharacter())
+	if (RBX::Network::Player* player =
+	        dynamic_cast<RBX::Network::Player*>(playerInstance.get())) {
+		player->loadCharacter();
+	}
+
+	m_isSoloPlay = true;
 }
 
 void CRobloxDoc::insertLDraw()

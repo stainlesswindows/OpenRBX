@@ -120,6 +120,7 @@ private:
 	std::vector<RBX::Verb*> m_ownedVerbs;
 	std::unique_ptr<RBX::DocumentVerbs> m_commands;
 	std::shared_ptr<CWorkspace> m_workspace;
+	bool m_isSoloPlay = false;
 };
 
 #endif // ROBLOXDOC_H
